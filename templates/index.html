@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobSpy Unified Scraper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Custom animation for the running status */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-fast {
+            animation: pulse-fast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-900">
+
+    <nav class="bg-blue-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-robot text-2xl"></i>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">JobSpy Unified</h1>
+                    <p class="text-xs text-blue-200">Multi-Site Job Aggregator</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex items-center bg-blue-800 rounded-lg px-4 py-2 border border-blue-600">
+                    <span class="text-xs uppercase font-semibold text-blue-300 mr-2">Status:</span>
+                    {% if status.is_running %}
+                        <span class="flex items-center text-yellow-300 font-bold text-sm animate-pulse-fast">
+                            <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Running...
+                        </span>
+                    {% else %}
+                        <span class="flex items-center text-green-400 font-bold text-sm">
+                            <i class="fa-solid fa-check-circle mr-2"></i> Idle
+                        </span>
+                    {% endif %}
+                </div>
+
+                <a href="/reset" class="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-3 py-2 rounded shadow transition flex items-center gap-1" title="Stop scraper if stuck">
+                    <i class="fa-solid fa-power-off"></i> RESET
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 max-w-6xl">
+        
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-8">
+            <h2 class="text-lg font-bold text-gray-700 mb-4 border-b pb-2">
+                <i class="fa-solid fa-sliders mr-2"></i> Search Parameters
+            </h2>
+            
+            <form action="/scrape" method="POST">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    
+                    <div class="relative">
+                        <label class="block text-sm font-semibold text-gray-600 mb-1">Job Role</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-briefcase absolute left-3 top-3 text-gray-400"></i>
+                            <input type="text" name="role" placeholder="e.g. Python Developer" 
+                                class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1 ml-1">* Leave blank to search by location only</p>
+                    </div>
+
+                    <div class="relative">
+                        <label class="block text-sm font-semibold text-gray-600 mb-1">Location</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-map-marker-alt absolute left-3 top-3 text-gray-400"></i>
+                            <input type="text" name="location" placeholder="e.g. Bangalore" 
+                                class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-600 mb-1">Experience Level</label>
+                        <select name="exp_level" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+                            <option value="">Any Experience</option>
+                            <option value="fresher" {% if current_exp_level == 'fresher' %}selected{% endif %}>Fresher / Entry Level</option>
+                            <option value="experienced" {% if current_exp_level == 'experienced' %}selected{% endif %}>Experienced</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-600 mb-1">Years (if Exp)</label>
+                        <input type="text" name="exp_years" placeholder="e.g. 1-3 or 5" value="{{ current_exp_years }}"
+                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 border-t pt-4">
+                    
+                    <div class="flex items-center gap-6">
+                        <label class="flex items-center cursor-pointer select-none">
+                            <div class="relative">
+                                <input type="checkbox" name="is_remote" class="sr-only peer">
+                                <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </div>
+                            <span class="ml-3 text-sm font-medium text-gray-700">Remote Only</span>
+                        </label>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-700">Limit:</span>
+                            <input type="number" name="results_wanted" value="20" min="5" max="50" 
+                                class="w-16 p-1 border border-gray-300 rounded text-center text-sm focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-search"></i> Start Scraping
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded shadow-sm" role="alert">
+                    <p>{{ message }}</p>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if status.error %}
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm flex items-start gap-3">
+            <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+            <div>
+                <p class="font-bold">System Alert</p>
+                <p class="text-sm">{{ status.error }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="flex flex-col md:flex-row justify-between items-end mb-4 gap-4">
+            
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">
+                    {{ jobs|length }} <span class="text-gray-500 text-lg font-normal">jobs found</span>
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    <i class="fa-regular fa-clock"></i> Last updated: {{ status.last_updated }}
+                </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                {% if jobs|length > 0 %}
+                <a href="/download" class="text-gray-600 hover:text-green-600 font-medium text-sm border border-gray-300 px-3 py-2 rounded bg-white hover:bg-green-50 transition">
+                    <i class="fa-solid fa-file-csv mr-1"></i> Download CSV
+                </a>
+                {% endif %}
+
+                <div class="bg-gray-200 p-1 rounded-lg flex text-sm font-medium">
+                    <a href="/?show_all=false&exp_level={{ current_exp_level }}&exp_years={{ current_exp_years }}" 
+                       class="px-4 py-2 rounded-md transition-all duration-200 {% if not show_all %}bg-white text-blue-700 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+                       Filtered View
+                    </a>
+                    <a href="/?show_all=true&exp_level={{ current_exp_level }}&exp_years={{ current_exp_years }}" 
+                       class="px-4 py-2 rounded-md transition-all duration-200 {% if show_all %}bg-white text-blue-700 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+                       Show All
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4">
+            {% for job in jobs %}
+            <div class="group bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-blue-300 transition-all duration-300 relative overflow-hidden">
+                <span class="absolute top-0 right-0 bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    {{ job.site }}
+                </span>
+
+                <div class="flex justify-between items-start gap-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-blue-700 group-hover:underline decoration-2 underline-offset-2">
+                            {{ job.title }}
+                        </h3>
+                        <p class="text-gray-800 font-semibold mt-1 text-sm">{{ job.company }}</p>
+                        
+                        <div class="flex flex-wrap gap-y-2 gap-x-4 mt-3 text-sm text-gray-500">
+                            <span class="flex items-center"><i class="fa-solid fa-location-dot mr-1.5 text-gray-400"></i> {{ job.location }}</span>
+                            <span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5 text-gray-400"></i> Posted: {{ job.date_posted }}</span>
+                        </div>
+                        
+                        <p class="text-xs text-gray-400 mt-3 line-clamp-2">
+                            {{ job.description[:180] }}...
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col items-end justify-center min-w-[100px]">
+                        <a href="{{ job.job_url }}" target="_blank" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg font-bold text-sm transition-colors border border-blue-200">
+                            Apply <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                    <i class="fa-solid fa-folder-open text-gray-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900">No jobs found</h3>
+                <p class="text-gray-500 mt-1 max-w-sm mx-auto">Try adjusting your search filters or start a new scrape above.</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+    </div>
+
+    {% if status.is_running %}
+    <script>
+        console.log("Scraper running... refreshing in 5s");
+        setTimeout(function(){
+            // Reload page to check for new results
+            // preserving current URL parameters (like filters)
+            window.location.reload();
+        }, 5000);
+    </script>
+    {% endif %}
+
+</body>
+</html>
